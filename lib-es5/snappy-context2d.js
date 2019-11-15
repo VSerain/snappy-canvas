@@ -14,10 +14,10 @@ var SnappyContext2D = function () {
 
         _classCallCheck(this, SnappyContext2D);
 
-        Object.defineProperty(this, "_context2d", {
+        Object.defineProperty(this, "canvas", {
             enumerable: false,
             configurable: false,
-            value: context2d
+            value: context2d.canvas
         });
         Object.defineProperty(this, "_drawing", {
             enumerable: false,
@@ -395,6 +395,11 @@ var SnappyContext2D = function () {
                         ctx.restore();
                     } }
 
+                // Hit regions
+                // TODO addHitRegion()        /!\ Experimental
+                // TODO removeHitRegion()     /!\ Experimental
+                // TODO clearHitRegion()      /!\ Experimental
+
             };
 
             // Let it draw! Let it draw!
@@ -426,9 +431,9 @@ var SnappyContext2D = function () {
             ctx.restore();
         }
     }, {
-        key: "canvas",
+        key: "_context2d",
         get: function get() {
-            return this._context2d.canvas;
+            return this.canvas.getContext("2d");
         }
     }, {
         key: "globalTranslationX",
