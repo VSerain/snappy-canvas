@@ -141,7 +141,9 @@ var SnappyContext2D = function () {
                 globalScale: 1,
                 scaleLineWidth: true,
                 scaleDashesWidth: true,
-                autoResizeCanvas: false
+                autoResizeCanvas: false,
+                disableSnappy: false,
+                minLineWidth: 1
             }, options)
         });
         Object.defineProperty(this, "_contextStatus", {
@@ -228,7 +230,7 @@ var SnappyContext2D = function () {
                 tx: options.globalTranslationX,
                 ty: options.globalTranslationY,
                 scale: options.globalScale,
-                lw: options.scaleLineWidth ? Math.max(1, options.globalScale | 0) : 1
+                lw: options.scaleLineWidth ? Math.max(options.minLineWidth, options.globalScale) : 1
             };
 
             // Helpers
@@ -248,13 +250,15 @@ var SnappyContext2D = function () {
             // Filters
 
             var _posx = function _posx(x, cs) {
+                if (options.disableSnappy) return (x + cs.tx) * cs.scale + cs.lw * isStroke % 2 / 2;
                 return ((x + cs.tx) * cs.scale | 0) + cs.lw * isStroke % 2 / 2;
             };
             var _posy = function _posy(y, cs) {
+                if (options.disableSnappy) return (y + cs.ty) * cs.scale + cs.lw * isStroke % 2 / 2;
                 return ((y + cs.ty) * cs.scale | 0) + cs.lw * isStroke % 2 / 2;
             };
             var _size = function _size(s, cs) {
-                return s * cs.scale | 0;
+                return options.disableSnappy ? s * cs.scale : s * cs.scale | 0;
             };
             var _nop = function _nop(v, cs) {
                 return v;
@@ -346,11 +350,14 @@ var SnappyContext2D = function () {
                 lineWidth: { fn: function fn(operation, operationName) {
                         var lineWidth;
                         if (options.scaleLineWidth) {
-                            lineWidth = (arguments.length <= 2 ? undefined : arguments[2]) * contextStatus.scale | 0;
+                            lineWidth = (arguments.length <= 2 ? undefined : arguments[2]) * contextStatus.scale;
                         } else {
-                            lineWidth = (arguments.length <= 2 ? undefined : arguments[2]) | 0;
+                            lineWidth = arguments.length <= 2 ? undefined : arguments[2];
                         }
-                        lineWidth = Math.max(1, lineWidth);
+
+                        if (!options.disableSnappy) lineWidth = lineWidth | 0;
+
+                        lineWidth = Math.max(options.minLineWidth, lineWidth);
                         contextStatus.lw = lineWidth;
                         ctx.lineWidth = lineWidth;
                     } },
@@ -372,7 +379,8 @@ var SnappyContext2D = function () {
                         ctx.setLineDash(tmp);
                     } },
                 lineDashOffset: { fn: function fn(operation, operationName) {
-                        ctx.lineDashOffset = (arguments.length <= 2 ? undefined : arguments[2]) * (contextStatus.scaleDashesWidth ? contextStatus.scale : 1) | 0;
+                        ctx.lineDashOffset = (arguments.length <= 2 ? undefined : arguments[2]) * (contextStatus.scaleDashesWidth ? contextStatus.scale : options.minLineWidth);
+                        if (!options.disableSnappy) ctx.lineDashOffset = ctx.lineDashOffset | 0;
                     } },
 
                 // Text styles
@@ -426,17 +434,23 @@ var SnappyContext2D = function () {
                 // Transformation
                 // currentTransform    -> not supported
                 rotate: { fn: function fn(operation, operationName, angle) {
-                        var tx = contextStatus.tx * contextStatus.scale | 0;
-                        var ty = contextStatus.ty * contextStatus.scale | 0;
-                        contextStatus.tx = 0;
-                        contextStatus.ty = 0;
-                        ctx.translate(tx, ty);
+                        if (!options.disableSnappy) {
+                            var tx = contextStatus.tx * contextStatus.scale | 0;
+                            var ty = contextStatus.ty * contextStatus.scale | 0;
+                            contextStatus.tx = 0;
+                            contextStatus.ty = 0;
+                            ctx.translate(tx, ty);
+                        }
                         ctx.rotate(angle);
                     } },
                 // scale               -> not supported
                 translate: { fn: function fn(operation, operationName, tx, ty) {
-                        contextStatus.tx += tx;
-                        contextStatus.ty += ty;
+                        if (!options.disableSnappy) {
+                            contextStatus.tx += tx;
+                            contextStatus.ty += ty;
+                        } else {
+                            ctx.translate(tx * contextStatus.scale, ty * contextStatus.scale);
+                        }
                     } },
                 // transform()         -> not supported
                 // resetTransform()    -> not supported
@@ -537,6 +551,19 @@ var SnappyContext2D = function () {
             ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             _drawStack(this._drawing);
             ctx.restore();
+        }
+    }, {
+        key: "disableSnappy",
+        get: function get() {
+            return this._options.disableSnappy;
+        },
+        set: function set(disable) {
+            this._options.disableSnappy = disable;
+        }
+    }, {
+        key: "minLineWidth",
+        set: function set(width) {
+            this._options.minLineWidth = width;
         }
     }, {
         key: "_context2d",
